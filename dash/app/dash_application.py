@@ -1,4 +1,4 @@
-from dash import Dash, html, dcc, Input, Output, callback
+from dash import Dash, html, dcc, Input, Output
 import pandas as pd
 import dash_bootstrap_components as dbc
 import plotly.express as px
@@ -56,15 +56,14 @@ dash_app.layout = dbc.Container(
     fluid=True,
     className='bg-dark',
 )
-    
-@callback(Output("graph_cpu", 'figure'), Output("graph_ram", "figure"), Input("timer", 'n_intervals'))
+
+@dash_app.callback([Output("graph_cpu", 'figure'), Output("graph_ram", "figure"), Output("graph_rom", "figure")], [Input("timer", 'n_intervals')])
 def update_graph(n):
     monitor.update_df()
     
     processor_info = f"frequency - <span style='color:red'>{psutil.cpu_freq().current / 1000:.2f}</span> GHz, Cores - <span style='color:red'>{psutil.cpu_count(logical=False)}"
 
     cpu_graph_title = f"<i>Here is information about CPUs (like average load, load by each CPU, initial information about frequency, etc.):</i><br><br><span style='color:blue'>CPU Usage: {processor_info}</span>"
-
 
     traces_cpu = list()
     for t in monitor.df.columns[:-1]:
@@ -104,7 +103,39 @@ def update_graph(n):
             name='memory_capacity[GB]')
     ]
 
-    return {"data": traces_cpu, "layout": {"template": "ggplot2", "title": cpu_graph_title}}, {"data": traces_ram, "layout": {"template": "ggplot2", "title": ram_graph_title}}
+    rom_graph_title = f"<i>Here is information about ROM (like disk usage, total disk space):</i>"
+
+    disk_usage_info = psutil.disk_usage('/')
+    traces_rom = [
+        # plotly.graph_objs.Line(
+        #     x=[monitor.df.index[-1]],
+        #     y=[disk_io_info.read_bytes / (1024 ** 3)],  # Disk read in GB
+        #     name='disk_read[GB]',
+        #     mode='markers',
+        #     marker=dict(color='blue', size=10)
+        # ),
+
+        # plotly.graph_objs.Line(
+        #     x=[monitor.df.index[-1]],
+        #     y=[disk_io_info.write_bytes / (1024 ** 3)],  # Disk write in GB
+        #     name='disk_write[GB]',
+        #     mode='markers',
+        #     marker=dict(color='red', size=10)
+        ),
+        
+        plotly.graph_objs.Line(
+            x=monitor.df.index,
+            y=[disk_usage_info.percent] * len(monitor.df.index),
+            name='disk_usage_percent'
+        ),
+
+        plotly.graph_objs.Line(
+            x=monitor.df.index,
+            y=[disk_usage_info.total / (1024 ** 3)] * len(monitor.df.index),
+            name='total_disk_space[GB]')
+    ]
+
+    return {"data": traces_cpu, "layout": {"template": "ggplot2", "title": cpu_graph_title}}, {"data": traces_ram, "layout": {"template": "ggplot2", "title": ram_graph_title}}, {"data": traces_rom, "layout": {"template": "ggplot2", "title": rom_graph_title}}
 
 if __name__ == "__main__":
     monitor.update_df()
